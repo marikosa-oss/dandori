@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>段取り変更共有</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#EEF1F5; --surface:#FFFFFF; --ink:#1A2233; --muted:#5B6578; --line:#CBD2DE;
+  --indigo:#2F4597; --indigo-soft:#E2E7F6; --thread:#D9A21B; --ok:#1E7A4C;
+  color-scheme:light;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#121722; --surface:#1B2232; --ink:#E7EBF3; --muted:#9AA4B8; --line:#333E55;
+    --indigo:#8EA2F0; --indigo-soft:#26304A; --thread:#E8B931; --ok:#5CC48E;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#121722; --surface:#1B2232; --ink:#E7EBF3; --muted:#9AA4B8; --line:#333E55;
+  --indigo:#8EA2F0; --indigo-soft:#26304A; --thread:#E8B931; --ok:#5CC48E;
+  color-scheme:dark;
+}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font-family:"BIZ UDPGothic","Hiragino Sans","Hiragino Kaku Gothic ProN","Yu Gothic","Meiryo",sans-serif;
+  font-size:16px;line-height:1.6;-webkit-text-size-adjust:100%}
+main{max-width:560px;margin:0 auto;padding:16px 14px 120px}
+h1{font-size:1.35rem;margin:6px 2px 14px;letter-spacing:.02em}
+section{background:var(--surface);border-radius:10px;padding:12px 14px 14px;margin-bottom:12px;
+  border-left:3px dashed var(--indigo)}
+h2{font-size:1rem;margin:0 0 8px;color:var(--indigo)}
+h2::before{content:"■ "}
+label.f{display:block;margin:8px 0 2px;font-size:.88rem;color:var(--muted)}
+input[type=text],input[type=number],input[type=time]{
+  width:100%;font:inherit;font-size:16px;color:var(--ink);background:var(--bg);
+  border:1px solid var(--line);border-radius:8px;padding:10px 12px;min-height:44px}
+input:focus-visible,button:focus-visible,summary:focus-visible{outline:3px solid var(--thread);outline-offset:2px}
+.row{display:flex;gap:10px}.row>div{flex:1;min-width:0}
+.unit{display:flex;align-items:center;gap:6px}.unit span{color:var(--muted);white-space:nowrap}
+.seg{display:flex;gap:6px;margin-top:2px}
+.seg input{position:absolute;opacity:0;pointer-events:none}
+.seg label{flex:1;text-align:center;padding:10px 0;border:1px solid var(--line);border-radius:8px;
+  background:var(--bg);cursor:pointer;min-height:44px}
+.seg input:checked+label{background:var(--indigo);border-color:var(--indigo);color:var(--surface);font-weight:700}
+.seg input:focus-visible+label{outline:3px solid var(--thread);outline-offset:2px}
+details.calc{margin-top:10px;background:var(--indigo-soft);border-radius:8px;padding:8px 12px}
+details.calc summary{cursor:pointer;font-weight:700;color:var(--indigo);min-height:32px;display:flex;align-items:center}
+.result{margin-top:8px;font-size:.92rem;line-height:1.7}
+.result b{font-size:1.05rem}
+.note{font-size:.82rem;color:var(--muted);margin:4px 0 0}
+.nextday{color:var(--thread);font-weight:700}
+input:disabled{opacity:.45}
+#helpNote{color:var(--ink);font-weight:700}
+#helpNote::before{content:"⚠ ";color:var(--thread)}
+.preview{white-space:pre-wrap;font-size:.88rem;background:var(--bg);border-radius:8px;padding:10px 12px;margin:0;
+  border:1px solid var(--line);overflow-x:auto}
+.bar{position:fixed;left:0;right:0;bottom:0;background:var(--surface);border-top:1px solid var(--line);
+  padding:10px 14px calc(10px + env(safe-area-inset-bottom,0px));display:flex;gap:8px;justify-content:center}
+.bar button{flex:1;max-width:260px;min-height:48px;font:inherit;font-weight:700;border-radius:10px;cursor:pointer;border:1px solid var(--indigo)}
+#btnShare{background:var(--indigo);color:var(--surface)}
+#btnCopy{background:var(--surface);color:var(--indigo)}
+#btnClear{flex:0 0 auto;background:transparent;color:var(--muted);border-color:var(--line);padding:0 14px}
+.toast{position:fixed;left:50%;bottom:calc(84px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);
+  background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:8px;font-size:.9rem;opacity:0;
+  transition:opacity .2s;pointer-events:none;max-width:90%;text-align:center}
+.toast.show{opacity:1}
+@media (prefers-reduced-motion:reduce){.toast{transition:none}}
+</style>
+</head>
+<body>
+<main>
+<h1>段取り変更共有</h1>
+
+<section>
+  <h2>休みの人</h2>
+  <input type="text" id="rest" list="dl-people" autocomplete="off" placeholder="例：山田、佐藤">
+</section>
+
+<section>
+  <h2>作業担当</h2>
+  <label class="f" for="sewer">縫製者</label>
+  <input type="text" id="sewer" list="dl-people" autocomplete="off">
+  <label class="f" for="process">工程</label>
+  <input type="text" id="process" list="dl-process" autocomplete="off">
+  <label class="f" for="qty">枚数</label>
+  <div class="unit"><input type="number" id="qty" inputmode="numeric" min="0"><span>枚</span></div>
+</section>
+
+<section>
+  <h2>作業予定時間</h2>
+  <div class="row">
+    <div><label class="f" for="start">開始</label><input type="time" id="start"></div>
+    <div><label class="f" for="end">終了</label><input type="time" id="end"></div>
+  </div>
+  <p class="note" id="endNote" hidden><span class="nextday">終了は翌日扱い</span>（送信文に「翌」が付きます）</p>
+
+  <details class="calc" id="calcBox">
+    <summary>終了時刻を自動計算（休憩込み）</summary>
+    <div class="row">
+      <div><label class="f" for="sec">工数（秒/枚）</label><input type="number" id="sec" inputmode="decimal" min="0" step="0.1"></div>
+      <div><label class="f" for="eff">能率</label><div class="unit"><input type="number" id="eff" inputmode="decimal" min="1" step="1" value="85"><span>%</span></div></div>
+    </div>
+    <div class="result" id="calcResult">枚数・開始・工数を入れると、終了に自動で入ります。</div>
+  </details>
+
+  <label class="f" for="reporter">終了報告担当者</label>
+  <input type="text" id="reporter" list="dl-people" autocomplete="off">
+</section>
+
+<section>
+  <h2>材料準備</h2>
+  <label class="f" for="matTp">TP</label>
+  <input type="text" id="matTp" list="dl-people" autocomplete="off">
+  <label class="f" for="matTo">運搬先</label>
+  <input type="text" id="matTo" list="dl-place" autocomplete="off">
+  <label class="f" for="matTime">時間（○時○分まで）</label>
+  <input type="time" id="matTime">
+</section>
+
+<section>
+  <h2>片づけ</h2>
+  <label class="f" for="clnTp">TP</label>
+  <input type="text" id="clnTp" list="dl-people" autocomplete="off">
+  <label class="f" for="clnTo">片づけ先</label>
+  <input type="text" id="clnTo" list="dl-place" autocomplete="off">
+</section>
+
+<section>
+  <h2>立ち会い（教育者）</h2>
+  <label class="f" for="trainer">担当者</label>
+  <input type="text" id="trainer" list="dl-people" autocomplete="off">
+</section>
+
+<section>
+  <h2>変化点チェック</h2>
+  <label class="f">ヘルプ</label>
+  <div class="seg">
+    <input type="radio" name="help" id="help1" value="必要"><label for="help1">必要</label>
+    <input type="radio" name="help" id="help0" value="不要"><label for="help0">不要</label>
+  </div>
+  <label class="f" for="helperName">ヘルプ担当者</label>
+  <input type="text" id="helperName" list="dl-people" autocomplete="off">
+  <div class="row">
+    <div><label class="f" for="helperStart">ヘルプ開始</label><input type="time" id="helperStart"></div>
+    <div><label class="f" for="helperEnd">ヘルプ終了</label><input type="time" id="helperEnd"></div>
+  </div>
+  <p class="note" id="helpNote" hidden></p>
+</section>
+
+<section>
+  <h2>必要な治具（押さえ・ガイド）</h2>
+  <label class="f">有無</label>
+  <div class="seg">
+    <input type="radio" name="jig" id="jig1" value="あり"><label for="jig1">あり</label>
+    <input type="radio" name="jig" id="jig0" value="なし"><label for="jig0">なし</label>
+  </div>
+  <label class="f" for="jigName">治具</label>
+  <input type="text" id="jigName" list="dl-jig" autocomplete="off">
+</section>
+
+<section>
+  <h2>送信内容の確認</h2>
+  <pre class="preview" id="preview"></pre>
+</section>
+
+<datalist id="dl-people"></datalist>
+<datalist id="dl-process"></datalist>
+<datalist id="dl-place"></datalist>
+<datalist id="dl-jig"></datalist>
+</main>
+
+<div class="bar">
+  <button id="btnClear" type="button">クリア</button>
+  <button id="btnCopy" type="button">コピー</button>
+  <button id="btnShare" type="button">送信</button>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+(function(){
+  var $=function(id){return document.getElementById(id)};
+  var TEXT_IDS=["rest","sewer","process","qty","start","end","reporter","matTp","matTo","matTime","clnTp","clnTo","trainer","helperName","helperStart","helperEnd","jigName","sec","eff"];
+  var BREAKS=[[600,610],[720,760],[900,910],[1080,1090]];
+  var endNextDay=false;
+  var DRAFT_KEY="dandori-draft-v1", HIST_KEY="dandori-history-v1";
+
+  function store(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
+  function load(k){try{var s=localStorage.getItem(k);return s?JSON.parse(s):null}catch(e){return null}}
+  function radio(name){var r=document.querySelector('input[name="'+name+'"]:checked');return r?r.value:""}
+  function setRadio(name,v){document.querySelectorAll('input[name="'+name+'"]').forEach(function(r){r.checked=(r.value===v)})}
+
+  function hm(v,nextDay){
+    if(!v) return "　　時　　分";
+    var p=v.split(":");return (nextDay?"翌":"")+parseInt(p[0],10)+"時"+p[1]+"分";
+  }
+  function toMin(v){if(!v)return null;var p=v.split(":");return parseInt(p[0],10)*60+parseInt(p[1],10)}
+  function fromMin(m){m=((m%1440)+1440)%1440;var h=Math.floor(m/60),mm=m%60;return (h<10?"0":"")+h+":"+(mm<10?"0":"")+mm}
+
+  function hhmm(v){if(!v)return "　　:　　";var p=v.split(":");return parseInt(p[0],10)+":"+p[1]}
+  function helperText(){
+    var n=$("helperName").value.trim(),s=$("helperStart").value,e=$("helperEnd").value;
+    if(!n&&!s&&!e)return "";
+    return n+"（"+hhmm(s)+"〜"+hhmm(e)+"）";
+  }
+
+  function buildText(){
+    var v=function(id){return $(id).value.trim()};
+    var help=radio("help")||"必要・不要", jig=radio("jig")||"あり・なし";
+    var qty=v("qty");
+    return [
+      "【段取り変更共有】","",
+      "■ 休みの人："+v("rest"),"",
+      "■ 作業担当",
+      "縫製者："+v("sewer"),
+      "工程："+v("process"),
+      "枚数："+(qty?qty:"　　　")+"枚","",
+      "■ 作業予定時間",
+      "開始："+hm(v("start")),
+      "終了："+hm(v("end"),endNextDay),
+      "終了報告担当者："+v("reporter"),"",
+      "■ 材料準備",
+      "TP："+v("matTp"),
+      "運搬先："+v("matTo"),
+      "時間："+hm(v("matTime"))+"まで","",
+      "■ 片づけ",
+      "TP："+v("clnTp"),
+      "片づけ先："+v("clnTo"),"",
+      "■ 立ち会い（教育者）",
+      "担当者："+v("trainer"),"",
+      "■ 変化点チェック",
+      "ヘルプ："+help,
+      "ヘルプ担当者(時間)："+helperText(),"",
+      "■ 必要な治具（押さえ・ガイド）",
+      "有無："+jig,
+      "治具："+v("jigName")
+    ].join("\n");
+  }
+
+  // 休憩込みの完了時刻（仕様：必要時間計算 2026-10-08）
+  function calcEnd(startMin,workMin){
+    var t=startMin,rem=workMin,added=0,day=0,i,b;
+    for(i=0;i<BREAKS.length;i++){b=BREAKS[i];
+      if(t>=b[0]&&t<b[1]){added+=b[1]-t;t=b[1];break;}}
+    for(var guard=0;guard<500;guard++){
+      for(i=0;i<BREAKS.length;i++){
+        var s=day*1440+BREAKS[i][0], e=day*1440+BREAKS[i][1];
+        if(s<t) continue;
+        if(t+rem<=s) return {end:t+rem,added:added};
+        rem-=(s-t);added+=(e-s);t=e;
+      }
+      day++;
+    }
+    return {end:t+rem,added:added};
+  }
+
+  function runCalc(){
+    var q=parseFloat($("qty").value), s=parseFloat($("sec").value), e=parseFloat($("eff").value), st=toMin($("start").value);
+    var box=$("calcResult");
+    if(!(q>0&&s>0&&e>0)||st===null){box.textContent="枚数・開始・工数を入れると、終了に自動で入ります。";return;}
+    var hours=q*s/3600/(e/100), work=hours*60;
+    var r=calcEnd(st,work), endR=Math.round(r.end), nd=endR>=1440;
+    $("end").value=fromMin(endR); endNextDay=nd; $("endNote").hidden=!nd;
+    box.innerHTML="必要時間 <b>"+hours.toFixed(2)+"h</b>（約"+Math.round(work)+"分）<br>休憩加算 "+r.added+"分<br>完了予定 <b>"+(nd?'<span class="nextday">翌日</span> ':"")+fromMin(endR)+"</b>（終了に反映済み）";
+  }
+
+  function refresh(){ $("preview").textContent=buildText(); saveDraft(); }
+
+  function saveDraft(){
+    var d={};TEXT_IDS.forEach(function(id){d[id]=$(id).value});
+    d.help=radio("help");d.jig=radio("jig");d.endNextDay=endNextDay;d.calcOpen=$("calcBox").open;
+    store(DRAFT_KEY,d);
+  }
+  function restoreDraft(){
+    var d=load(DRAFT_KEY);if(!d)return;
+    TEXT_IDS.forEach(function(id){if(d[id]!=null)$(id).value=d[id]});
+    setRadio("help",d.help);setRadio("jig",d.jig);
+    endNextDay=!!d.endNextDay;$("endNote").hidden=!endNextDay;
+    if(d.calcOpen)$("calcBox").open=true;
+  }
+
+  var HIST_MAP={"dl-people":["rest","sewer","reporter","matTp","clnTp","trainer","helperName"],"dl-process":["process"],"dl-place":["matTo","clnTo"],"dl-jig":["jigName"]};
+  function renderHistory(){
+    var h=load(HIST_KEY)||{};
+    Object.keys(HIST_MAP).forEach(function(dl){
+      var el=$(dl);el.innerHTML="";
+      (h[dl]||[]).forEach(function(x){var o=document.createElement("option");o.value=x;el.appendChild(o)});
+    });
+  }
+  function saveHistory(){
+    var h=load(HIST_KEY)||{};
+    Object.keys(HIST_MAP).forEach(function(dl){
+      var list=h[dl]||[];
+      HIST_MAP[dl].forEach(function(id){
+        $(id).value.split(/[、,，]/).forEach(function(raw){
+          var x=raw.trim();if(!x)return;
+          list=list.filter(function(y){return y!==x});list.unshift(x);
+        });
+      });
+      h[dl]=list.slice(0,40);
+    });
+    store(HIST_KEY,h);renderHistory();
+  }
+
+  function syncJig(){
+    var none=radio("jig")==="なし";
+    if(none)$("jigName").value="";
+    $("jigName").disabled=none;
+    $("jigName").placeholder=none?"「なし」のため入力不要":"";
+  }
+  function syncHelp(){
+    var no=radio("help")==="不要";
+    ["helperName","helperStart","helperEnd"].forEach(function(id){if(no)$(id).value="";$(id).disabled=no;});
+    updateHelpNote();
+  }
+  function helpProblem(){
+    if(radio("help")!=="必要")return "";
+    var miss=[];
+    if(!$("helperName").value.trim())miss.push("担当者");
+    if(!$("helperStart").value||!$("helperEnd").value)miss.push("時間帯");
+    return miss.length?"ヘルプが「必要」ですが、"+miss.join("と")+"が未入力です。":"";
+  }
+  function updateHelpNote(){var p=helpProblem(),n=$("helpNote");n.textContent=p;n.hidden=!p;}
+  var warnAt=0;
+  function confirmSend(){
+    var p=helpProblem();
+    if(!p)return true;
+    if(Date.now()-warnAt<8000){warnAt=0;return true;}
+    warnAt=Date.now();updateHelpNote();
+    toast(p+"このまま送る場合は、もう一度押してください");
+    return false;
+  }
+
+  var toastTimer;
+  function toast(msg){var t=$("toast");t.textContent=msg;t.classList.add("show");clearTimeout(toastTimer);toastTimer=setTimeout(function(){t.classList.remove("show")},4000)}
+
+  function copyText(text){
+    if(navigator.clipboard&&navigator.clipboard.writeText){
+      return navigator.clipboard.writeText(text).then(function(){return true},function(){return legacyCopy(text)});
+    }
+    return Promise.resolve(legacyCopy(text));
+  }
+  function legacyCopy(text){
+    var ta=document.createElement("textarea");ta.value=text;ta.setAttribute("readonly","");
+    ta.style.position="fixed";ta.style.top="-1000px";document.body.appendChild(ta);ta.select();ta.setSelectionRange(0,text.length);
+    var ok=false;try{ok=document.execCommand("copy")}catch(e){}document.body.removeChild(ta);return ok;
+  }
+
+  $("btnCopy").addEventListener("click",function(){
+    if(!confirmSend())return;
+    var text=buildText();saveHistory();
+    copyText(text).then(function(ok){toast(ok?"コピーしました。LINE WORKSのトークに貼り付けてください":"コピーできませんでした。確認欄の文章を長押しでコピーしてください")});
+  });
+  $("btnShare").addEventListener("click",function(){
+    if(!confirmSend())return;
+    var text=buildText();saveHistory();
+    if(navigator.share){
+      navigator.share({text:text}).catch(function(err){
+        if(err&&err.name==="AbortError")return;
+        copyText(text).then(function(ok){toast(ok?"共有画面を開けないため、コピーしました。LINE WORKSに貼り付けてください":"確認欄の文章を長押しでコピーしてください")});
+      });
+    }else{
+      copyText(text).then(function(ok){toast(ok?"この端末では共有画面が使えないため、コピーしました":"確認欄の文章を長押しでコピーしてください")});
+    }
+  });
+  $("btnClear").addEventListener("click",function(){
+    if(!confirm("入力内容をすべて消しますか？（工数・能率と入力候補は残ります）"))return;
+    TEXT_IDS.forEach(function(id){if(id!=="sec"&&id!=="eff")$(id).value=""});
+    setRadio("help","");setRadio("jig","");syncJig();syncHelp();endNextDay=false;$("endNote").hidden=true;
+    $("calcResult").textContent="枚数・開始・工数を入れると、終了に自動で入ります。";
+    refresh();window.scrollTo(0,0);
+  });
+
+  document.addEventListener("input",function(e){
+    var id=e.target.id;
+    if(id==="end"){endNextDay=false;$("endNote").hidden=true;}
+    if(id==="jigName"&&$("jigName").value.trim()&&!radio("jig"))setRadio("jig","あり");
+    if(["helperName","helperStart","helperEnd"].indexOf(id)>=0)updateHelpNote();
+    if(["qty","sec","eff","start"].indexOf(id)>=0&&$("calcBox").open)runCalc();
+    refresh();
+  });
+  document.addEventListener("change",function(e){
+    if(e.target.name==="jig")syncJig();
+    if(e.target.name==="help")syncHelp();
+    refresh();
+  });
+  $("calcBox").addEventListener("toggle",function(){if($("calcBox").open)runCalc();saveDraft();});
+
+  restoreDraft();syncJig();syncHelp();renderHistory();refresh();
+})();
+</script>
+</body>
+</html>
