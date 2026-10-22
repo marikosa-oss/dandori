@@ -93,25 +93,6 @@ input:disabled{opacity:.45}
   <input type="text" id="process" list="dl-process" autocomplete="off">
   <label class="f" for="qty">枚数</label>
   <div class="unit"><input type="number" id="qty" inputmode="numeric" min="0"><span>枚</span></div>
-</section>
-
-<section>
-  <h2>作業予定時間</h2>
-  <div class="row">
-    <div><label class="f" for="start">開始</label><input type="time" id="start"></div>
-    <div><label class="f" for="end">終了</label><input type="time" id="end"></div>
-  </div>
-  <p class="note" id="endNote" hidden><span class="nextday">終了は翌日扱い</span>（送信文に「翌」が付きます）</p>
-
-  <details class="calc" id="calcBox">
-    <summary>終了時刻を自動計算（休憩込み）</summary>
-    <div class="row">
-      <div><label class="f" for="sec">工数（秒/枚）</label><input type="number" id="sec" inputmode="decimal" min="0" step="0.1"></div>
-      <div><label class="f" for="eff">能率</label><div class="unit"><input type="number" id="eff" inputmode="decimal" min="1" step="1" value="85"><span>%</span></div></div>
-    </div>
-    <div class="result" id="calcResult">枚数・開始・工数を入れると、終了に自動で入ります。</div>
-  </details>
-
   <label class="f" for="reporter">終了報告担当者</label>
   <input type="text" id="reporter" list="dl-people" autocomplete="off">
 </section>
@@ -188,7 +169,7 @@ input:disabled{opacity:.45}
 <script>
 (function(){
   var $=function(id){return document.getElementById(id)};
-  var TEXT_IDS=["rest","sewer","process","qty","start","end","reporter","matTp","matTo","matTime","clnTp","clnTo","trainer","helperName","helperStart","helperEnd","jigName","sec","eff"];
+  var TEXT_IDS=["rest","sewer","process","qty","reporter","matTp","matTo","matTime","clnTp","clnTo","trainer","helperName","helperStart","helperEnd","jigName"];
   var BREAKS=[[600,610],[720,760],[900,910],[1080,1090]];
   var endNextDay=false;
   var DRAFT_KEY="dandori-draft-v1", HIST_KEY="dandori-history-v1";
@@ -222,10 +203,7 @@ input:disabled{opacity:.45}
       "■ 作業担当",
       "縫製者："+v("sewer"),
       "工程："+v("process"),
-      "枚数："+(qty?qty:"　　　")+"枚","",
-      "■ 作業予定時間",
-      "開始："+hm(v("start")),
-      "終了："+hm(v("end"),endNextDay),
+      "枚数："+(qty?qty:"　　　")+"枚",
       "終了報告担当者："+v("reporter"),"",
       "■ 材料準備",
       "TP："+v("matTp"),
@@ -276,15 +254,13 @@ input:disabled{opacity:.45}
 
   function saveDraft(){
     var d={};TEXT_IDS.forEach(function(id){d[id]=$(id).value});
-    d.help=radio("help");d.jig=radio("jig");d.endNextDay=endNextDay;d.calcOpen=$("calcBox").open;
+    d.help=radio("help");d.jig=radio("jig");
     store(DRAFT_KEY,d);
   }
   function restoreDraft(){
     var d=load(DRAFT_KEY);if(!d)return;
     TEXT_IDS.forEach(function(id){if(d[id]!=null)$(id).value=d[id]});
     setRadio("help",d.help);setRadio("jig",d.jig);
-    endNextDay=!!d.endNextDay;$("endNote").hidden=!endNextDay;
-    if(d.calcOpen)$("calcBox").open=true;
   }
 
   var HIST_MAP={"dl-people":["rest","sewer","reporter","matTp","clnTp","trainer","helperName"],"dl-process":["process"],"dl-place":["matTo","clnTo"],"dl-jig":["jigName"]};
@@ -362,29 +338,28 @@ input:disabled{opacity:.45}
   $("btnShare").addEventListener("click",function(){
     if(!confirmSend())return;
     var text=buildText();saveHistory();
+    var copied=legacyCopy(text);
+    var done=function(){toast("文章はコピー済みです。宛先が選べなかった場合は、LINE WORKSで送りたいトークを開いて貼り付けてください")};
     if(navigator.share){
-      navigator.share({text:text}).catch(function(err){
-        if(err&&err.name==="AbortError")return;
-        copyText(text).then(function(ok){toast(ok?"共有画面を開けないため、コピーしました。LINE WORKSに貼り付けてください":"確認欄の文章を長押しでコピーしてください")});
+      navigator.share({text:text}).then(function(){if(copied)done();},function(err){
+        if(copied){done();return;}
+        copyText(text).then(function(ok){toast(ok?"コピーしました。LINE WORKSのトークに貼り付けてください":"確認欄の文章を長押しでコピーしてください")});
       });
     }else{
       copyText(text).then(function(ok){toast(ok?"この端末では共有画面が使えないため、コピーしました":"確認欄の文章を長押しでコピーしてください")});
     }
   });
   $("btnClear").addEventListener("click",function(){
-    if(!confirm("入力内容をすべて消しますか？（工数・能率と入力候補は残ります）"))return;
-    TEXT_IDS.forEach(function(id){if(id!=="sec"&&id!=="eff")$(id).value=""});
-    setRadio("help","");setRadio("jig","");syncJig();syncHelp();endNextDay=false;$("endNote").hidden=true;
-    $("calcResult").textContent="枚数・開始・工数を入れると、終了に自動で入ります。";
+    if(!confirm("入力内容をすべて消しますか？（入力候補は残ります）"))return;
+    TEXT_IDS.forEach(function(id){$(id).value=""});
+    setRadio("help","");setRadio("jig","");syncJig();syncHelp();
     refresh();window.scrollTo(0,0);
   });
 
   document.addEventListener("input",function(e){
     var id=e.target.id;
-    if(id==="end"){endNextDay=false;$("endNote").hidden=true;}
     if(id==="jigName"&&$("jigName").value.trim()&&!radio("jig"))setRadio("jig","あり");
     if(["helperName","helperStart","helperEnd"].indexOf(id)>=0)updateHelpNote();
-    if(["qty","sec","eff","start"].indexOf(id)>=0&&$("calcBox").open)runCalc();
     refresh();
   });
   document.addEventListener("change",function(e){
@@ -392,7 +367,6 @@ input:disabled{opacity:.45}
     if(e.target.name==="help")syncHelp();
     refresh();
   });
-  $("calcBox").addEventListener("toggle",function(){if($("calcBox").open)runCalc();saveDraft();});
 
   restoreDraft();syncJig();syncHelp();renderHistory();refresh();
 })();
